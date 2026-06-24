@@ -3,8 +3,6 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-title" content="Lumen"/>
 <title>Lumen</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
@@ -23,9 +21,6 @@ nav .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;pa
 <body>
 <div id="app"><div style="padding:40px;text-align:center;color:#888">Carregando...</div></div>
 <script>
-// Wrap everything to catch errors
-(function() {
-try {
 
 var THEMES = {
   calm:  {bg:'#e6e4df',sf:'#f0ede8',ink:'#2a2925',bd:'#d4d0ca',mt:'#8a8880',dot:'#b5b3ae'},
@@ -417,10 +412,6 @@ function exportCSV(){
 loadData();
 render();
 
-} catch(err) {
-  document.getElementById('app').innerHTML='<div style="padding:40px;font-family:monospace;font-size:14px;color:#c00"><b>Erro:</b><br>'+err.message+'<br><br>'+err.stack+'</div>';
-}
-})();
 </script>
 </body>
 </html>
