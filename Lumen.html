@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-title" content="Lumen"/>
+<title>Lumen</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;overscroll-behavior:none;}
+button{font-family:inherit;cursor:pointer;-webkit-appearance:none;border:none;}
+input,textarea{font-family:inherit;-webkit-appearance:none;font-size:16px;border:none;outline:none;}
+#app{max-width:430px;margin:0 auto;min-height:100vh;position:relative;}
+.page{padding:20px 16px 96px;overflow-y:auto;min-height:100vh;}
+nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;display:flex;z-index:100;padding:6px 0 calc(8px + env(safe-area-inset-bottom,0px));}
+nav .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 4px;font-size:10px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;background:none;}
+.btn{border-radius:12px;font-size:14px;font-weight:700;padding:13px 18px;width:100%;text-align:center;display:block;cursor:pointer;}
+.card{border-radius:16px;padding:16px;margin-bottom:12px;}
+.inp{padding:10px 12px;border-radius:10px;font-size:16px;width:100%;}
+</style>
+</head>
+<body>
+<div id="app"><div style="padding:40px;text-align:center;color:#888">Carregando...</div></div>
+<script>
+// Wrap everything to catch errors
+(function() {
+try {
+
+var THEMES = {
+  calm:  {bg:'#e6e4df',sf:'#f0ede8',ink:'#2a2925',bd:'#d4d0ca',mt:'#8a8880',dot:'#b5b3ae'},
+  cozy:  {bg:'#f2e8d9',sf:'#faf3e8',ink:'#3a2e20',bd:'#e2d2b6',mt:'#9a8870',dot:'#c8a47c'},
+  dark:  {bg:'#1a1a18',sf:'#252523',ink:'#e8e6e0',bd:'#3a3a36',mt:'#888880',dot:'#555550'},
+  paper: {bg:'#f6f6f3',sf:'#ffffff', ink:'#1a1a18',bd:'#e0e0db',mt:'#888884',dot:'#c8c8c4'}
+};
+var DEF_SYMP = [
+  {id:'ansiedade',n:'Ansiedade'},{id:'depressao',n:'Depressão'},
+  {id:'irritab',n:'Irritabilidade'},{id:'impuls',n:'Impulsividade'},
+  {id:'oscilacoes',n:'Oscilações de humor'},{id:'dissociacao',n:'Dissociação'},
+  {id:'concentracao',n:'Dif. de concentração'},{id:'memoria',n:'Dif. de memória'},
+  {id:'autoestima',n:'Autoestima baixa'},{id:'motivacao',n:'Falta de motivação'}
+];
+var DEF_BSYMP = [
+  {id:'tensao',n:'Tensão muscular'},{id:'costas',n:'Dor nas costas'},
+  {id:'cabeca',n:'Dor de cabeça'},{id:'estomago',n:'Desconforto no estômago'},
+  {id:'fadiga',n:'Fadiga física'},{id:'apetite',n:'Alteração no apetite'}
+];
+var DEF_BEHAV = [
+  {id:'autolesao',n:'Autolesão'},{id:'explosao',n:'Explosão emocional'},
+  {id:'compulsao',n:'Compulsão alimentar'},{id:'isolamento',n:'Isolamento'},
+  {id:'evitacao',n:'Evitação'},{id:'agressao',n:'Agressão'},
+  {id:'unhas',n:'Roer as unhas'},{id:'espremer',n:'Espremer o rosto'}
+];
+var SUBS = ['Álcool','Cigarro','Maconha','Cocaína','Ketamina','Cogumelo','MD/ecstasy'];
+var INT = [{v:'nao',l:'Não',c:null},{v:'leve',l:'Leve',c:'#f4c84b'},{v:'mod',l:'Mod.',c:'#f08a4b'},{v:'int',l:'Intenso',c:'#e0506a'}];
+var STEPS = [
+  {id:'mood',    tp:'scale',title:'Como você está se sentindo hoje?',  sub:'De 1 a 10.',ac:'#6fcf6f',low:'Extremamente deprimida',high:'Extremamente eufórica'},
+  {id:'sleep',   tp:'scale',title:'Qualidade do sono',                 sub:'De 1 a 10.',ac:'#4bb3e6',low:'Péssima',high:'Excelente'},
+  {id:'meds',    tp:'meds', title:'Medicação de hoje',                 sub:'Marque o que já tomou.',ac:'#4bb3e6'},
+  {id:'symp',    tp:'symp', title:'Sintomas comportamentais',           sub:'Intensidade de cada sintoma.',ac:'#f08a4b'},
+  {id:'bsymp',   tp:'bsymp',title:'Sintomas físicos',                  sub:'De nenhum a muito intenso.',ac:'#b98cf0'},
+  {id:'behav',   tp:'behav',title:'Comportamentos-problema',           sub:'Marque a intensidade de cada um.',ac:'#e0506a'},
+  {id:'subs',    tp:'subs', title:'Uso de substâncias?',               sub:'Sem julgamento — só registro.',ac:'#b98cf0'},
+  {id:'exercise',tp:'yesno',title:'Se exercitou hoje?',                sub:'Qualquer movimento conta.',ac:'#6fcf6f'},
+  {id:'ideation',tp:'scale',title:'Ideação suicida',                   sub:'De 1 a 10. Seja gentil consigo ao responder.',ac:'#ef6f8c',low:'Nenhuma',high:'Intensa'},
+  {id:'unhappy', tp:'scale',title:'Infelicidade',                      sub:'De 1 a 10.',ac:'#f4a23b',low:'Nenhuma',high:'Muita'},
+  {id:'therapy', tp:'scale',title:'Comprometimento com a terapia',     sub:'De 1 a 10.',ac:'#4bb3e6',low:'Nenhum',high:'Total'},
+  {id:'selfcomp',tp:'scale',title:'Autocompaixão',                     sub:'De 1 a 10.',ac:'#b98cf0',low:'Nenhuma',high:'Muita'},
+  {id:'pleasant',tp:'text', title:'Atividades prazerosas do dia',      sub:'O que te fez bem hoje?',ac:'#6fcf6f',ph:'Ex.: caminhar, música, banho quente...'},
+  {id:'good',    tp:'text', title:'O que aconteceu de bom hoje?',      sub:'Pode ser algo pequeno.',ac:'#6fcf6f',ph:'Algo bom de hoje...'},
+  {id:'bad',     tp:'text', title:'O que foi ruim ou difícil hoje?',   sub:'Sem filtro — isto é só seu.',ac:'#f08a4b',ph:'O que pesou hoje...'},
+  {id:'gratitude',tp:'text',title:'Pelo que você sente gratidão hoje?',sub:'Respire e pense com calma.',ac:'#b98cf0',ph:'Sou grato(a) por...'},
+  {id:'notes',   tp:'text', title:'Observações do dia',                sub:'Qualquer coisa que queira registrar.',ac:'#8a8880',ph:'Outras notas...'},
+  {id:'_result', tp:'result'}
+];
+var TOTAL_STEPS = STEPS.filter(function(s){return s.tp!=='result';}).length;
+
+// State
+var S = {theme:'calm',entries:[],journal:[],meds:[],draft:'',symp:clone(DEF_SYMP),bsymp:clone(DEF_BSYMP),behav:clone(DEF_BEHAV)};
+var screen = 'home';
+var ciStep = 0;
+var ciAns = {};
+var saveTimer = null;
+
+function clone(arr) { return arr.map(function(x){return {id:x.id,n:x.n};}); }
+
+function loadData() {
+  try {
+    var raw = localStorage.getItem('lumen_v1');
+    if (raw) {
+      var d = JSON.parse(raw);
+      if (!d.meds) d.meds = [];
+      if (!d.draft) d.draft = '';
+      if (!d.journal) d.journal = [];
+      if (!d.symp) d.symp = clone(DEF_SYMP);
+      if (!d.bsymp) d.bsymp = clone(DEF_BSYMP);
+      if (!d.behav) d.behav = clone(DEF_BEHAV);
+      S = d;
+    }
+  } catch(e) {}
+}
+
+function saveData() {
+  try { localStorage.setItem('lumen_v1', JSON.stringify(S)); } catch(e) {}
+}
+
+function mutate(fn) { fn(S); saveData(); render(); }
+function th() { return THEMES[S.theme] || THEMES.calm; }
+
+function today() { return new Date().toISOString().slice(0,10); }
+function greet() { var h=new Date().getHours(); return h<12?'Bom dia':h<18?'Boa tarde':'Boa noite'; }
+function fmtDate(iso) {
+  if (!iso) return '';
+  return new Date(iso+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'});
+}
+function moodColor(pct) {
+  pct = Math.max(0,Math.min(100,pct||0));
+  var stops = [[0,0xef,0x6f,0x8c],[33,0xf4,0xa2,0x3b],[66,0x6f,0xcf,0x6f],[100,0x4b,0xb3,0xe6]];
+  var lo=stops[0],hi=stops[stops.length-1];
+  for (var i=0;i<stops.length-1;i++) { if(pct>=stops[i][0]&&pct<=stops[i+1][0]){lo=stops[i];hi=stops[i+1];break;} }
+  var t=(pct-lo[0])/((hi[0]-lo[0])||1);
+  return 'rgb('+Math.round(lo[1]+(hi[1]-lo[1])*t)+','+Math.round(lo[2]+(hi[2]-lo[2])*t)+','+Math.round(lo[3]+(hi[3]-lo[3])*t)+')';
+}
+function valPct(v) { return v>0 ? Math.round((v-1)/9*100) : 50; }
+function todayEntry() { return S.entries.filter(function(e){return e.date===today();})[0]; }
+function avg7() {
+  var r = S.entries.slice(-7).filter(function(e){return e.ans&&e.ans.mood;});
+  if (!r.length) return null;
+  return +(r.reduce(function(s,e){return s+(e.ans.mood||0);},0)/r.length).toFixed(1);
+}
+
+function go(sc, edit) {
+  if (sc==='checkin') {
+    ciStep = 0;
+    if (edit) {
+      var ex = todayEntry();
+      ciAns = ex ? JSON.parse(JSON.stringify(ex.ans)) : {};
+      S.meds.forEach(function(m){ if(ciAns['m_'+m]===undefined) ciAns['m_'+m]=false; });
+    } else {
+      ciAns = {};
+      S.meds.forEach(function(m){ ciAns['m_'+m]=false; });
+    }
+  }
+  screen = sc; render();
+}
+
+function faceSVG(pct,size) {
+  size = size||72;
+  var col=moodColor(pct); var cy=52+(pct/100)*16;
+  return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 100 100" fill="none">'
+    +'<circle cx="50" cy="50" r="46" fill="'+col+'" opacity=".14"/>'
+    +'<circle cx="50" cy="50" r="46" stroke="'+col+'" stroke-width="3"/>'
+    +'<circle cx="36" cy="42" r="5" fill="'+col+'"/>'
+    +'<circle cx="64" cy="42" r="5" fill="'+col+'"/>'
+    +'<path d="M 36 64 Q 50 '+cy+' 64 64" stroke="'+col+'" stroke-width="3.5" stroke-linecap="round" fill="none"/>'
+    +'</svg>';
+}
+
+// HOME
+function renderHome() {
+  var T=th(); var entry=todayEntry(); var mp=entry?valPct(entry.ans.mood):50; var col=moodColor(mp); var avg=avg7();
+  var lastJ = S.journal.length ? S.journal[S.journal.length-1] : null;
+
+  var dots = Object.keys(THEMES).map(function(id){
+    return '<div onclick="mutate(function(s){s.theme=\''+id+'\'})" style="width:22px;height:22px;border-radius:11px;background:'+THEMES[id].dot+';cursor:pointer;border:2.5px solid '+(S.theme===id?T.ink:'transparent')+'"></div>';
+  }).join('');
+
+  var entryHTML = entry
+    ? '<div class="card" style="background:'+T.sf+';border:1px solid '+T.bd+';text-align:center;padding:24px 16px 16px">'
+        +faceSVG(mp,72)
+        +'<div style="font-size:40px;font-weight:900;color:'+col+';margin-top:8px;line-height:1">'+entry.ans.mood+'</div>'
+        +'<div style="font-size:12px;color:'+T.mt+';margin-top:4px">humor de hoje · '+fmtDate(today())+'</div>'
+        +'<button class="btn" onclick="go(\'checkin\',true)" style="margin-top:12px;font-size:12px;padding:8px 16px;background:'+T.sf+';color:'+T.ink+';border:1.5px solid '+T.bd+'">Editar check-in ✎</button>'
+        +'</div>'
+    : '<button onclick="go(\'checkin\')" style="background:'+T.ink+';color:'+T.bg+';border-radius:16px;padding:18px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;width:100%;border:none;cursor:pointer;text-align:left">'
+        +'<div><div style="font-size:16px;font-weight:700">Check-in de hoje</div><div style="font-size:12px;opacity:.5;margin-top:2px">Como você está se sentindo?</div></div>'
+        +'<span style="font-size:20px">→</span></button>';
+
+  var statsHTML = avg!==null
+    ? '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'
+        +'<div style="background:'+T.sf+';border:1px solid '+T.bd+';border-radius:12px;padding:14px"><div style="font-size:28px;font-weight:800;color:'+moodColor(valPct(avg))+'">'+avg+'</div><div style="font-size:11px;color:'+T.mt+'">humor médio (7d)</div></div>'
+        +'<div style="background:'+T.sf+';border:1px solid '+T.bd+';border-radius:12px;padding:14px"><div style="font-size:28px;font-weight:800;color:'+T.ink+'">'+S.entries.length+'</div><div style="font-size:11px;color:'+T.mt+'">dias registrados</div></div>'
+        +'</div>' : '';
+
+  var lastJHTML = lastJ
+    ? '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:'+T.mt+';margin:16px 0 8px">último diário</div>'
+      +'<div class="card" onclick="go(\'journal\')" style="background:'+T.sf+';border:1px solid '+T.bd+';cursor:pointer">'
+      +'<div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:11px;color:'+T.mt+'">'+fmtDate(lastJ.date)+'</span>'
+      +(lastJ.mood?'<span style="font-size:11px;font-weight:700;color:'+moodColor(valPct(lastJ.mood))+'">humor '+lastJ.mood+'</span>':'')+'</div>'
+      +'<div style="font-size:14px;line-height:1.6;color:'+T.ink+';overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">'+lastJ.text+'</div></div>' : '';
+
+  var exportHTML = S.entries.length
+    ? '<button class="btn" onclick="exportCSV()" style="background:'+T.sf+';color:'+T.ink+';border:1.5px solid '+T.bd+';font-size:12px;padding:10px 16px;margin-top:4px">↓ Exportar registros (CSV)</button>' : '';
+
+  return '<div class="page" style="background:'+T.bg+'">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">'
+    +'<h1 style="font-size:22px;font-weight:800;color:'+T.ink+'">'+greet()+' ✦</h1>'
+    +'<div style="display:flex;align-items:center;gap:10px"><div style="display:flex;gap:7px">'+dots+'</div></div>'
+    +'</div>'
+    +entryHTML+statsHTML+lastJHTML+exportHTML+'</div>';
+}
+
+// CHECK-IN
+function renderCheckin() {
+  if (ciStep >= TOTAL_STEPS || STEPS[ciStep].tp === 'result') return renderResult();
+  var step = STEPS[ciStep]; var T=th(); var ac=step.ac||'#6fcf6f';
+  var pct = Math.round(ciStep/TOTAL_STEPS*100);
+  var val = ciAns[step.id];
+  var vp = val>0 ? valPct(val) : null;
+  var col = vp!=null ? moodColor(vp) : T.mt;
+  var stepHTML = '';
+
+  if (step.tp==='scale') {
+    var lowHigh = step.low ? '<div style="display:flex;justify-content:space-between;font-size:10px;color:'+T.mt+';margin:4px 0"><span>'+step.low+'</span><span>'+step.high+'</span></div>' : '';
+    var cells = '';
+    for (var i=1;i<=10;i++) {
+      var on=val===i; var c=moodColor(valPct(i));
+      cells += '<div onclick="ciAns[\''+step.id+'\']='+i+';render()" style="aspect-ratio:1;border-radius:8px;border:1.5px solid '+(on?'transparent':T.bd)+';background:'+(on?c:T.sf)+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;cursor:pointer;color:'+(on?'#fff':T.ink)+'">'+i+'</div>';
+    }
+    stepHTML = '<div style="text-align:center;margin:8px 0">'+faceSVG(vp!=null?vp:50,68)+'<div style="font-size:36px;font-weight:900;color:'+col+';margin-top:8px;line-height:1">'+(val||'·')+'</div></div>'+lowHigh+'<div style="display:grid;grid-template-columns:repeat(10,1fr);gap:4px;margin:14px 0">'+cells+'</div>';
+  }
+
+  if (step.tp==='meds') {
+    var medsHTML = S.meds.length===0 ? '<div style="font-size:13px;color:'+T.mt+';padding:8px 0">Nenhuma medicação cadastrada.</div>' : '';
+    S.meds.forEach(function(m) {
+      var on=ciAns['m_'+m];
+      medsHTML += '<div onclick="ciAns[\'m_'+m+'\']=!ciAns[\'m_'+m+'\'];render()" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid '+T.bd+';cursor:pointer">'
+        +'<div style="width:20px;height:20px;border-radius:10px;border:2px solid '+(on?'#4bb3e6':T.bd)+';background:'+(on?'#4bb3e6':'transparent')+';display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(on?'<span style="color:#fff;font-size:11px">✓</span>':'')+'</div>'
+        +'<span style="font-size:14px;color:'+T.ink+'">'+m+'</span></div>';
+    });
+    stepHTML = '<div class="card" style="background:'+T.sf+';border:1px solid '+T.bd+';padding:8px 16px">'
+      +medsHTML
+      +'<div style="display:flex;gap:8px;margin-top:12px">'
+      +'<input id="med-inp" class="inp" style="border:1.5px solid '+T.bd+';background:'+T.bg+';color:'+T.ink+'" placeholder="Adicionar medicação" onkeydown="if(event.key===\'Enter\')addMed()"/>'
+      +'<button onclick="addMed()" class="btn" style="width:auto;padding:10px 14px;font-size:13px;background:'+T.sf+';color:'+T.ink+';border:1.5px solid '+T.bd+'">+</button>'
+      +'</div></div>';
+  }
+
+  if (step.tp==='symp'||step.tp==='bsymp'||step.tp==='behav') {
+    var listKey=step.tp; var items=S[listKey]; var ans=ciAns[step.id]||{};
+    var itemsHTML='';
+    items.forEach(function(item) {
+      var v=ans[item.id]||'nao';
+      var btns='';
+      INT.forEach(function(int) {
+        var on=v===int.v;
+        btns+='<div onclick="setIntAns(\''+step.id+'\',\''+item.id+'\',\''+int.v+'\')" style="padding:4px 7px;border-radius:20px;border:1.5px solid '+(on?(int.c||T.ink):T.bd)+';background:'+(on?(int.c||T.ink):'transparent')+';color:'+(on?(int.c?'#fff':T.bg):T.mt)+';font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">'+int.l+'</div>';
+      });
+      itemsHTML+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid '+T.bd+'">'
+        +'<span style="font-size:13px;font-weight:500;color:'+T.ink+';flex:1;margin-right:8px">'+item.n+'</span>'
+        +'<div style="display:flex;gap:4px;flex-wrap:nowrap">'+btns
+        +'<div onclick="mutate(function(s){s[\''+listKey+'\']=s[\''+listKey+'\'].filter(function(i){return i.id!==\''+item.id+'\'})})" style="padding:4px 6px;border-radius:20px;border:1.5px solid '+T.bd+';color:'+T.mt+';font-size:11px;cursor:pointer">×</div>'
+        +'</div></div>';
+    });
+    stepHTML='<div class="card" style="background:'+T.sf+';border:1px solid '+T.bd+';padding:4px 16px">'+itemsHTML
+      +'<div style="display:flex;gap:8px;padding:12px 0 4px;border-top:1px solid '+T.bd+'">'
+      +'<input id="symp-inp" class="inp" style="border:1.5px solid '+T.bd+';background:'+T.bg+';color:'+T.ink+'" placeholder="Adicionar" onkeydown="if(event.key===\'Enter\')addSymp(\''+listKey+'\')" />'
+      +'<button onclick="addSymp(\''+listKey+'\')" class="btn" style="width:auto;padding:10px 14px;font-size:13px;background:'+T.sf+';color:'+T.ink+';border:1.5px solid '+T.bd+'">+</button>'
+      +'</div></div>';
+  }
+
+  if (step.tp==='subs') {
+    var used=ciAns.subsUsed; var sel=ciAns.subsList||{}; var qty=ciAns.subsQty||{};
+    var subsHTML='';
+    if (used===true) {
+      SUBS.forEach(function(s) {
+        subsHTML+='<div>'
+          +'<div onclick="toggleSub(\''+s+'\')" style="padding:10px 14px;border-radius:10px;border:1.5px solid '+(sel[s]?'#b98cf0':T.bd)+';background:'+(sel[s]?'rgba(185,140,240,.15)':T.sf)+';color:'+(sel[s]?'#b98cf0':T.ink)+';font-size:13px;font-weight:600;cursor:pointer">'+s+'</div>'
+          +(sel[s]?'<input class="inp" style="border:1.5px solid '+T.bd+';background:'+T.bg+';color:'+T.ink+';margin-top:4px" placeholder="Quantidade usada..." value="'+(qty[s]||'')+'" oninput="setSubQty(\''+s+'\',this.value)"/>':'')
+          +'</div>';
+      });
+    }
+    stepHTML='<div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'
+      +'<button onclick="ciAns.subsUsed=true;render()" class="btn" style="padding:20px;font-size:16px;background:'+(used===true?T.ink:T.sf)+';color:'+(used===true?T.bg:T.ink)+';border:1.5px solid '+(used===true?T.ink:T.bd)+'">Sim</button>'
+      +'<button onclick="ciAns.subsUsed=false;ciAns.subsList={};ciAns.subsQty={};render()" class="btn" style="padding:20px;font-size:16px;background:'+(used===false?T.ink:T.sf)+';color:'+(used===false?T.bg:T.ink)+';border:1.5px solid '+(used===false?T.ink:T.bd)+'">Não</button>'
+      +'</div>'+(used===true?'<div style="display:flex;flex-direction:column;gap:8px">'+subsHTML+'</div>':'')+'</div>';
+  }
+
+  if (step.tp==='yesno') {
+    var yv=ciAns[step.id];
+    stepHTML='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">'
+      +'<button onclick="ciAns[\''+step.id+'\']=true;render()" class="btn" style="padding:20px;font-size:16px;background:'+(yv===true?ac:T.sf)+';color:'+(yv===true?'#fff':T.ink)+';border:1.5px solid '+(yv===true?ac:T.bd)+'">Sim ✓</button>'
+      +'<button onclick="ciAns[\''+step.id+'\']=false;render()" class="btn" style="padding:20px;font-size:16px;background:'+(yv===false?T.ink:T.sf)+';color:'+(yv===false?'#fff':T.ink)+';border:1.5px solid '+(yv===false?T.ink:T.bd)+'">Não</button>'
+      +'</div>';
+  }
+
+  if (step.tp==='text') {
+    stepHTML='<textarea id="text-inp" style="width:100%;min-height:110px;padding:12px;border-radius:10px;border:1.5px solid '+ac+';background:'+T.bg+';color:'+T.ink+';font-size:16px;line-height:1.65;resize:vertical;outline:none;font-family:inherit" placeholder="'+(step.ph||'')+'" oninput="ciAns[\''+step.id+'\']=this.value">'+(ciAns[step.id]||'')+'</textarea>';
+  }
+
+  var prevBtn = ciStep>0 ? '<button onclick="ciStep--;render()" class="btn" style="width:48px;padding:13px;font-size:18px;background:'+T.sf+';color:'+T.ink+';border:1.5px solid '+T.bd+'">←</button>' : '';
+
+  return '<div class="page" style="background:'+T.bg+'">'
+    +'<div style="height:3px;border-radius:2px;margin-bottom:22px;overflow:hidden;background:'+T.bd+'"><div style="height:100%;width:'+pct+'%;background:'+ac+';border-radius:2px;transition:width .3s"></div></div>'
+    +'<div style="font-size:20px;font-weight:800;line-height:1.25;color:'+T.ink+';margin-bottom:6px">'+step.title+'</div>'
+    +'<div style="font-size:13px;color:'+T.mt+';margin-bottom:16px">'+step.sub+'</div>'
+    +stepHTML
+    +'<div style="display:flex;gap:10px;margin-top:20px">'+prevBtn
+    +'<button onclick="nextStep()" class="btn" style="flex:1;background:'+ac+';color:#fff;border:none;font-size:15px">'+(ciStep>=TOTAL_STEPS-1?'Finalizar ✓':'Continuar')+'</button>'
+    +'</div></div>';
+}
+
+function renderResult() {
+  var T=th(); var a=ciAns; var mp=valPct(a.mood||5); var col=moodColor(mp);
+  var rows=[{l:'Sono',v:a.sleep},{l:'Terapia',v:a.therapy},{l:'Autocomp.',v:a.selfcomp},{l:'Infelicid.',v:a.unhappy},{l:'Ideação',v:a.ideation},{l:'Exercício',v:a.exercise===true?'✓':a.exercise===false?'✗':null}].filter(function(r){return r.v!=null&&r.v!=='';});
+  var cardsHTML = rows.slice(0,6).map(function(r){
+    return '<div style="background:'+T.sf+';border:1px solid '+T.bd+';border-radius:10px;padding:10px 6px;text-align:center"><div style="font-size:20px;font-weight:800;color:'+T.ink+'">'+r.v+'</div><div style="font-size:10px;color:'+T.mt+';margin-top:2px">'+r.l+'</div></div>';
+  }).join('');
+  return '<div class="page" style="background:'+T.bg+'">'
+    +'<div style="text-align:center;padding:24px 0 16px">'+faceSVG(mp,80)
+    +'<div style="font-size:56px;font-weight:900;letter-spacing:-2px;line-height:1;color:'+col+';margin:10px 0 4px">'+(a.mood||'—')+'</div>'
+    +'<div style="font-size:12px;color:'+T.mt+'">'+fmtDate(today())+'</div></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0">'+cardsHTML+'</div>'
+    +'<button class="btn" onclick="saveCheckin()" style="background:'+T.ink+';color:'+T.bg+';border:none;margin-bottom:10px">Salvar check-in</button>'
+    +'<button class="btn" onclick="go(\'home\')" style="background:'+T.sf+';color:'+T.ink+';border:1.5px solid '+T.bd+';font-size:13px">Fechar sem salvar</button>'
+    +'</div>';
+}
+
+function renderJournal() {
+  var T=th(); var entry=todayEntry(); var moodV=entry&&entry.ans?entry.ans.mood:null;
+  var moodLine = moodV ? '<div style="font-size:11px;color:'+T.mt+';margin-top:8px">Humor de hoje: <span style="color:'+moodColor(valPct(moodV))+';font-weight:700">'+moodV+'</span></div>' : '';
+  var jList = '';
+  if (S.journal.length) {
+    var rev = S.journal.slice().reverse();
+    rev.forEach(function(j){
+      jList+='<div style="padding:12px 0;border-bottom:1px solid '+T.bd+'">'
+        +'<div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-size:11px;color:'+T.mt+'">'+fmtDate(j.date)+'</span>'
+        +(j.mood?'<span style="font-size:11px;font-weight:700;color:'+moodColor(valPct(j.mood))+'">● '+j.mood+'</span>':'')+'</div>'
+        +'<div style="font-size:14px;line-height:1.6;color:'+T.ink+'">'+j.text+'</div></div>';
+    });
+  }
+  var entriesHTML = S.journal.length
+    ? '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:'+T.mt+';margin:16px 0 8px">'+S.journal.length+' entradas</div>'
+      +'<div class="card" style="background:'+T.sf+';border:1px solid '+T.bd+';padding:4px 16px">'+jList+'</div>'
+    : '<div style="text-align:center;padding:32px 16px;color:'+T.mt+';font-size:14px">Nenhuma entrada ainda. Escreva algo ✍</div>';
+  return '<div class="page" style="background:'+T.bg+'">'
+    +'<h1 style="font-size:22px;font-weight:800;color:'+T.ink+';margin-bottom:20px">Diário</h1>'
+    +'<div class="card" style="background:'+T.sf+';border:1px solid '+T.bd+'">'
+    +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:'+T.mt+';margin-bottom:10px">novo registro</div>'
+    +'<textarea id="journal-inp" style="width:100%;min-height:110px;padding:12px;border-radius:10px;border:1.5px solid '+T.bd+';background:'+T.bg+';color:'+T.ink+';font-size:16px;line-height:1.65;resize:vertical;outline:none;font-family:inherit" placeholder="Como você está se sentindo? O que passou pela sua mente hoje?"></textarea>'
+    +moodLine
+    +'<button class="btn" onclick="saveJournal()" style="background:'+T.ink+';color:'+T.bg+';border:none;margin-top:12px">Salvar entrada</button>'
+    +'</div>'+entriesHTML+'</div>';
+}
+
+function renderNav() {
+  var T=th();
+  var tabs=[
+    {id:'home',l:'Início',icon:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>'},
+    {id:'checkin',l:'Check-in',icon:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>'},
+    {id:'journal',l:'Diário',icon:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>'}
+  ];
+  var html = '<nav style="background:'+T.sf+';border-top:1px solid '+T.bd+'">';
+  tabs.forEach(function(tab){
+    html+='<button class="tab" onclick="go(\''+tab.id+'\')" style="color:'+(screen===tab.id?T.ink:T.mt)+'">'+tab.icon+'<span>'+tab.l+'</span></button>';
+  });
+  return html+'</nav>';
+}
+
+function render() {
+  var T=th(); document.body.style.background=T.bg;
+  var pageHTML='';
+  if(screen==='home') pageHTML=renderHome();
+  else if(screen==='checkin') pageHTML=(ciStep>=TOTAL_STEPS||STEPS[ciStep].tp==='result')?renderResult():renderCheckin();
+  else if(screen==='journal') pageHTML=renderJournal();
+  document.getElementById('app').innerHTML='<div style="max-width:430px;margin:0 auto;min-height:100vh;position:relative">'+pageHTML+renderNav()+'</div>';
+
+  // Restore journal draft
+  if (screen==='journal') {
+    var el=document.getElementById('journal-inp');
+    if(el) el.value=S.draft||'';
+  }
+}
+
+// Actions
+function nextStep(){if(ciStep<TOTAL_STEPS-1)ciStep++;else ciStep=TOTAL_STEPS;render();}
+function setIntAns(sid,iid,v){if(!ciAns[sid])ciAns[sid]={};ciAns[sid][iid]=v;render();}
+function addMed(){var el=document.getElementById('med-inp');if(!el)return;var v=el.value.trim();if(!v)return;mutate(function(s){s.meds.push(v);});el.value='';}
+function addSymp(lk){var el=document.getElementById('symp-inp');if(!el)return;var v=el.value.trim();if(!v)return;mutate(function(s){s[lk].push({id:'u_'+Date.now(),n:v});});el.value='';}
+function toggleSub(name){if(!ciAns.subsList)ciAns.subsList={};ciAns.subsList[name]=!ciAns.subsList[name];render();}
+function setSubQty(name,v){if(!ciAns.subsQty)ciAns.subsQty={};ciAns.subsQty[name]=v;}
+function saveCheckin(){mutate(function(s){s.entries=s.entries.filter(function(e){return e.date!==today();});s.entries.push({date:today(),ans:JSON.parse(JSON.stringify(ciAns)),ts:Date.now()});s.entries.sort(function(a,b){return a.date.localeCompare(b.date);});});go('home');}
+function saveJournal(){
+  var el=document.getElementById('journal-inp');
+  var text=el?el.value.trim():'';
+  if(!text)return;
+  var entry=todayEntry();
+  mutate(function(s){s.journal.push({id:Date.now(),date:today(),text:text,mood:entry&&entry.ans?entry.ans.mood:null,ts:Date.now()});s.draft='';});
+  if(el)el.value='';
+}
+function exportCSV(){
+  if(!S.entries.length)return;
+  function q(v){if(v==null)return'';var s=String(v).replace(/"/g,'""');return(s.indexOf(',')>=0||s.indexOf('"')>=0||s.indexOf('\n')>=0)?'"'+s+'"':s;}
+  function iLabel(v){return v==='nao'?'Não':v==='leve'?'Leve':v==='mod'?'Moderado':v==='int'?'Intenso':'';}
+  function sStr(obj,list){if(!obj)return'';return list.map(function(i){var v=obj[i.id];return(v&&v!=='nao')?i.n+': '+iLabel(v):'';}).filter(Boolean).join('; ');}
+  var hdr=['Data','Humor','Sono','Ideação suicida','Infelicidade','Terapia','Autocompaixão','Exercitou?','Substâncias usadas','Quais substâncias','Quantidade','Medicações','Sint. comportamentais','Sint. físicos','Comportamentos','Ativ. prazerosas','O que foi bom','O que foi difícil','Gratidão','Observações','Diário'];
+  var rows=S.entries.map(function(e){
+    var a=e.ans||{};
+    var meds=S.meds.filter(function(m){return a['m_'+m];}).join('; ');
+    var subsKeys=a.subsUsed===true?Object.keys(a.subsList||{}).filter(function(k){return a.subsList[k];}):[];
+    var qty=subsKeys.map(function(k){var qv=(a.subsQty||{})[k];return qv?k+': '+qv:k;}).join('; ');
+    var jDay=S.journal.filter(function(j){return j.date===e.date;}).map(function(j){return j.text;}).join(' | ');
+    return[q(e.date),q(a.mood),q(a.sleep),q(a.ideation),q(a.unhappy),q(a.therapy),q(a.selfcomp),
+      q(a.exercise===true?'Sim':a.exercise===false?'Não':''),
+      q(a.subsUsed===true?'Sim':a.subsUsed===false?'Não':''),q(subsKeys.join('; ')),q(qty),q(meds),
+      q(sStr(a['symp'],S.symp)),q(sStr(a['bsymp'],S.bsymp)),q(sStr(a['behav'],S.behav)),
+      q(a.pleasant),q(a.good),q(a.bad),q(a.gratitude),q(a.notes),q(jDay)].join(',');
+  });
+  var csv='\uFEFF'+[hdr.map(q).join(',')].concat(rows).join('\n');
+  var blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download='lumen_'+today()+'.csv';a.click();
+  URL.revokeObjectURL(url);
+}
+
+loadData();
+render();
+
+} catch(err) {
+  document.getElementById('app').innerHTML='<div style="padding:40px;font-family:monospace;font-size:14px;color:#c00"><b>Erro:</b><br>'+err.message+'<br><br>'+err.stack+'</div>';
+}
+})();
+</script>
+</body>
+</html>
